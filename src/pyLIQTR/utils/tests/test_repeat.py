@@ -41,6 +41,22 @@ class TestRepeatBloq(unittest.TestCase):
         )
 
     @staticmethod
+    def circuit_equality(repeated_circuit, repeated_bloq, decomp=1):
+        '''
+            Tests circuits for equality, moment by moment
+        '''
+        
+        return all(
+            map(
+                lambda x: x[0] == x[1],
+                zip(
+                    repeated_circuit,
+                    circuit_decompose_multi(repeated_bloq, decomp)
+                )
+            )
+        ) 
+
+    @staticmethod
     def generator_commutative_equality(repeated_circuit, repeated_bloq):
         '''
             Tests equality for generator decompose
@@ -105,6 +121,8 @@ class TestRepeatBloq(unittest.TestCase):
         )
 
         assert self.generator_commutative_equality(repeated_circuit, repeat_bloq)
+        assert self.circuit_equality(repeated_circuit, repeat_bloq)
+
 
 
     def test_gate(self):
@@ -113,7 +131,7 @@ class TestRepeatBloq(unittest.TestCase):
         '''
         n_repetitions = 9
 
-        gate = cirq.X  
+        gate = cirq.X 
         qubits = cirq.GridQubit.square(2)
 
         op = gate(qubits[0]) 
@@ -123,9 +141,14 @@ class TestRepeatBloq(unittest.TestCase):
             qubits[0],
             n_repetitions=n_repetitions
         )
-        
+       
+        repeated_circuit = cirq.Circuit()
+        for _ in range(n_repetitions):
+            repeated_circuit.append(op)
+ 
         for generated_op in generator_decompose(repeat_bloq): 
             assert op == generated_op 
+        assert self.circuit_equality(repeated_circuit, repeat_bloq)
 
 
     def test_circuit(self):
@@ -143,6 +166,8 @@ class TestRepeatBloq(unittest.TestCase):
         repeat_bloq = Repeat(circ, n_repetitions=n_repetitions) 
 
         assert self.generator_equality(repeated_circuit, repeat_bloq)
+        assert self.circuit_equality(repeated_circuit, repeat_bloq)
+
     
 
 # Test runner without invoking subprocesses 
