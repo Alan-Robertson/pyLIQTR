@@ -3,7 +3,8 @@
     Contains the Repeat meta-bloq
     Also contains a helper function circuit_to_quregs
 '''
-from typing import Dict, Iterator, Generator
+from typing import Dict, Iterator, Generator 
+from types import FunctionType
 from numpy.typing import NDArray
 
 import cirq
@@ -37,7 +38,6 @@ class Repeat(GateWithRegisters):
                 *args,
                 n_repetitions: int = 1,
                 caching: bool = False,
-                cirq_quregs: dict = None,
                 **kwargs
             ):
         '''
@@ -53,9 +53,6 @@ class Repeat(GateWithRegisters):
         self.args = args
         self.kwargs = kwargs
         self.n_repetitions = n_repetitions
-
-        # Used to set quregs for bloq to cirq decomps if appropriate
-        self.cirq_quregs = cirq_quregs
 
         # Caches the circuit between iterations
         # Should only be used if the repeated object is small or constant
@@ -129,8 +126,7 @@ class Repeat(GateWithRegisters):
         '''
         yield self.subbloq.to_cirq_circuit(
             *self.args,
-            cirq_quregs=self.cirq_quregs,
-            **self.kwargs
+            *self.kwargs
         )
 
     def build_composite_bloq(
@@ -195,6 +191,13 @@ class Repeat(GateWithRegisters):
         for _ in range(self.n_repetitions):
             yield from self.decompose_once()
 
+    def __iter__(self) -> Generator[
+            qualtran.Bloq | cirq.Gate | cirq.Circuit,
+            None,
+            None
+            ]:
+        return self.decompose()
+
     def decompose_once(self) -> Generator[
             qualtran.Bloq | cirq.Gate | cirq.Circuit,
             None,
@@ -229,3 +232,130 @@ class Repeat(GateWithRegisters):
         These qubit counts only account for non-ancillae qubits
         '''
         return self.signature.n_qubits()
+
+
+
+class Parameterised(GateWithRegisters):
+    '''
+        Parameterised Tagging Bloq 
+        Transparent Bloq wrapper that indicates to a `Map' bloq that this gate consumes arguments  
+        This Bloq should not be used outside of wrapper bloqs that handle the instantiation of
+        parameters 
+    '''
+
+    def __init__(
+                self,
+                subbloq_gen: FunctionType,
+                *args,
+                caching: bool = False,
+                **kwargs
+            ):
+        '''
+            Constructor for the Parameterised tagged Bloq 
+            :: subbloq_gen : FunctionType :: Constructor for the gate   
+            :: caching : bool :: Whether the repeated object should be cached
+            :: quregs : dict :: Map back to cirq qubit labels for qualtran bloq
+        '''
+        self.subbloq_gen = subbloq_gen
+
+        self.bound_args = args
+        self.bound_kwargs = kwargs 
+
+        self.args = None 
+        self.kwargs = None 
+
+    @property
+    def signature(self) -> Signature:
+        '''
+            Signature is instantiated after resolution
+        '''
+        pass
+
+    def __str__(self) -> str:
+        '''
+            Due to strcmp operations elsewhere in pyLIQTR this may cause issues
+        '''
+        return f'PARAM({str(self.subbloq)})'
+
+    def bind_params(self, *args, **kwargs):
+        '''
+            Setter method for binding args and kwargs 
+        '''
+        self.args = args 
+        self.kwargs = kwargs
+
+    def build_composite_bloq(
+            self,
+            bb: qualtran.BloqBuilder,
+            **soqs: qualtran.SoquetT
+            ) -> Dict[str, qualtran.SoquetT]:
+        '''
+            Naive composite bloq builder
+        '''
+        for subbloq in self.compose():
+            bb.add(subbloq, **soqs)
+        return soqs
+
+    def decompose_from_registers(
+        self,
+        *args,
+        context: cirq.DecompositionContext,
+        **quregs: NDArray[cirq.Qid]
+    ) -> Iterator[cirq.OP_TREE]:
+        '''
+            decompose_from_registers
+            Uses the subbloq's decomposition function and repeats the output
+        '''
+        if self.caching:
+            cached_obj = list(
+                self.subbloq.decompose_from_registers(
+                    *args,
+                    context,
+                    quregs
+                )
+            )
+            ops = iter(cached_obj)
+        else:
+            ops = self.subbloq.decompose_from_registers(*args, context, quregs)
+
+        yield from ops
+
+    #pylint: disable=arguments-differ, unused-argument
+    def _decompose_with_context_(self, *, context=None, **kwargs) -> Generator[
+            qualtran.Bloq | cirq.Gate | cirq.Circuit,
+            None,
+            None
+            ]:
+        # Actually passing this into the decomposition depends on the decomp
+        if context is None:
+            context = cirq.DecompositionContext(
+                cirq.ops.SimpleQubitManager()
+            )
+        yield from self.compose()
+
+    def compose(self) -> Generator[
+            qualtran.Bloq | cirq.Gate | cirq.Circuit,
+            None,
+            None
+            ]:
+        '''
+        Dispatch method for decomposer
+        Dynamic dispatch is set in the constructor
+        '''
+        bloq = self.subbloq_gen(
+            *self.bound_args, *self.args,
+            **self.bound_kwargs, **self.kwargs
+        )
+        yield bloq 
+
+    def _qid_shape_(self):
+        '''
+        Override for superclass abstract method
+        '''
+
+    def num_qubits(self):
+        '''
+        Instantiates against an abstract method
+        These qubit counts only account for non-ancillae qubits
+        '''
+        pass 
