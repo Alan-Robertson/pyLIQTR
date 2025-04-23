@@ -20,7 +20,7 @@ import random
 from pyLIQTR.utils.Hamiltonian             import Hamiltonian as pyH
 from pyLIQTR.utils.qsp_helpers             import circuit_decompose_once
 #utils
-from pyLIQTR.utils.utils import isWindows, open_fermion_to_qasm
+from pyLIQTR.utils.utils import isWindows, isLinux, isMac, open_fermion_to_qasm
 from pyLIQTR.utils.printing import openqasm
 from pyLIQTR.gate_decomp.cirq_transforms import clifford_plus_t_direct_transform
 
@@ -137,7 +137,7 @@ class TestUtils:
     @pytest.mark.parametrize('execution_number', range(10))
     def test_to_openqasm(self, vlasov_n8_qsp, execution_number):
         circuit_output = "".join([line for line in openqasm(circuit_in=vlasov_n8_qsp)])
-        assert(circuit_output is not "")
+        assert(circuit_output != "")
         #first 1000 chars
         test_output = circuit_output[0:1000]
         # Something appears to have changed in the seed generator in this version of cirq-ft which caused the vlasov to be different
