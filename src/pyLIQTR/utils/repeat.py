@@ -126,7 +126,7 @@ class Repeat(GateWithRegisters):
         '''
         yield self.subbloq.to_cirq_circuit(
             *self.args,
-            *self.kwargs
+            **self.kwargs
         )
 
     def build_composite_bloq(
@@ -232,7 +232,6 @@ class Repeat(GateWithRegisters):
         These qubit counts only account for non-ancillae qubits
         '''
         return self.signature.n_qubits()
-
 
 
 class Parameterised(GateWithRegisters):
@@ -347,6 +346,170 @@ class Parameterised(GateWithRegisters):
             **self.bound_kwargs, **self.kwargs
         )
         yield bloq 
+
+    def __iter__(self) -> Generator[
+            qualtran.Bloq | cirq.Gate | cirq.Circuit,
+            None,
+            None
+            ]:
+        return self.compose() 
+
+    def _qid_shape_(self):
+        '''
+        Override for superclass abstract method
+        '''
+
+    def num_qubits(self):
+        '''
+        Instantiates against an abstract method
+        These qubit counts only account for non-ancillae qubits
+        '''
+        pass 
+
+
+class ParamMap(GateWithRegisters):
+    '''
+        Parameterised Mapping Gate 
+        Bloq that takes a series of parameters and a sequence of gates / bloq objects  
+        When decomposed the parameters are consumed and the gate sequence is emitted
+        Parameters are consumed by Parameterised Bloqs 
+    '''
+
+    def __init__(
+                self,
+                parameters,
+                *gate_sequence,
+                caching: bool = False,
+                **kwargs
+            ):
+        '''
+            Constructor for the Parameterised tagged Bloq 
+            :: subbloq_gen : FunctionType :: Constructor for the gate   
+            :: caching : bool :: Whether the repeated object should be cached
+            :: quregs : dict :: Map back to cirq qubit labels for qualtran bloq
+        '''
+        self.sequence = sequence
+        self.parameters = parameters
+
+        self.kwargs = **kwargs 
+        self.caching = caching
+        self.cache = []
+        self.cache_state = []
+
+    @property
+    def signature(self) -> Signature:
+        '''
+            Signature is instantiated after resolution
+        '''
+        pass
+
+    def __str__(self) -> str:
+        '''
+            Due to strcmp operations elsewhere in pyLIQTR this may cause issues
+        '''
+        return f'MAP'
+
+    def build_composite_bloq(
+            self,
+            bb: qualtran.BloqBuilder,
+            **soqs: qualtran.SoquetT
+            ) -> Dict[str, qualtran.SoquetT]:
+        '''
+            Naive composite bloq builder
+        '''
+        for subbloq in self.compose():
+            bb.add(subbloq, **soqs)
+        return soqs
+
+    def decompose_from_registers(
+        self,
+        *args,
+        context: cirq.DecompositionContext,
+        **quregs: NDArray[cirq.Qid]
+    ) -> Iterator[cirq.OP_TREE]:
+        '''
+            decompose_from_registers
+            Uses the subbloq's decomposition function and repeats the output
+        '''
+        if self.caching:
+            cached_obj = list(
+                self.subbloq.decompose_from_registers(
+                    *args,
+                    context,
+                    quregs
+                )
+            )
+            ops = iter(cached_obj)
+        else:
+            ops = self.subbloq.decompose_from_registers(*args, context, quregs)
+
+        yield from ops
+
+    #pylint: disable=arguments-differ, unused-argument
+    def _decompose_with_context_(self, *, context=None, **kwargs) -> Generator[
+            qualtran.Bloq | cirq.Gate | cirq.Circuit,
+            None,
+            None
+            ]:
+        # Actually passing this into the decomposition depends on the decomp
+        if context is None:
+            context = cirq.DecompositionContext(
+                cirq.ops.SimpleQubitManager()
+            )
+        yield from self.compose()
+
+    @staticmethod
+    def infer_params(params):
+        # TODO
+        if len(params) == 2:
+            if isinstance(params[1], dict):  
+                return params 
+        pass
+
+    def compose(self) -> Generator[
+            qualtran.Bloq | cirq.Gate | cirq.Circuit,
+            None,
+            None
+            ]:
+        '''
+        Dispatch method for decomposer
+        Dynamic dispatch is set in the constructor
+        '''
+        cache_idx = 0
+        params = iter(self.parameters)
+        for idx, bloq in enumerate(self.sequence):
+
+            # Collect Parameterised Tags
+            if isinstance(bloq, Parameterised):
+                args, kwargs = self.infer_params(next(params))
+                bloq.bind_params(*args, **kwargs)
+                for seq in bloq.compose():
+                    yield seq
+
+                if self.caching:
+                    self.cache_state.append(False)
+                    self.cache.append(None)
+
+            else:  # Not Parameterised 
+
+                # Cache undiscovered object
+                if self.caching: 
+
+                    if (idx < len(self.cache_state) and self.cache_state[idx] is True):
+                        yield self.cache[idx]
+                        continue
+
+                    self.cache.append(bloq)
+                    self.cache_state.append(True)
+
+                yield bloq
+
+    def __iter__(self) -> Generator[
+            qualtran.Bloq | cirq.Gate | cirq.Circuit,
+            None,
+            None
+            ]:
+        return self.compose() 
 
     def _qid_shape_(self):
         '''

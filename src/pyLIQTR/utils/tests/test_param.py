@@ -1,0 +1,273 @@
+'''
+    Tests for the Param Bloq
+'''
+import types
+import unittest
+
+from functools import partial
+
+import cirq
+from qualtran import CompositeBloq
+from pyLIQTR.utils.repeat import Parameterised, Repeat 
+from pyLIQTR.utils.repeat import circuit_to_quregs
+
+from pyLIQTR.utils.circuit_decomposition import circuit_decompose_multi
+from pyLIQTR.utils.circuit_decomposition import generator_decompose
+
+
+class TestParamBloq(unittest.TestCase):
+    '''
+        Tests for the Repeat Bloq
+    '''
+
+    @staticmethod
+    def generate_circuit(
+            *,
+            n_repetitions: int = 1,
+            n_qubits: int = 2
+            ) -> cirq.Circuit:
+        '''
+        Generates a simple circuit to test on
+        '''
+        circ = cirq.Circuit()
+        q = [cirq.LineQubit(i) for i in range(n_qubits)]
+
+        for _ in range(n_repetitions):
+            for i in range(n_qubits - 1):
+                circ.append(cirq.H(q[i]))
+                circ.append(cirq.CNOT(q[i], q[i + 1]))
+
+        return circ
+
+    @staticmethod
+    def generate_bloqs(
+        *,
+        n_repetitions: int = 1,
+        n_qubits: int = 2
+        ) -> None:
+
+        from qualtran.bloqs.basic_gates import CNOT, Hadamard
+        from qualtran import BloqBuilder
+        CX = CNOT()
+        H = Hadamard()
+
+        bb = BloqBuilder() 
+
+        qubits = [
+            bb.add_register(f'q{i}', 1)
+            for i in range(n_qubits)
+        ]
+        
+        for _ in range(n_repetitions):
+            for i in range(n_qubits - 1):
+                qubits[i] = bb.add(H, q=qubits[i])
+                qubits[i], qubits[i + 1] = bb.add(CX, ctrl=qubits[i], target=qubits[i + 1])
+        cbloq=bb.finalize(**{f'q{i}':qubits[i] for i in range(len(qubits))})
+        return cbloq
+                
+
+    @staticmethod
+    def generator_equality(
+            repeated_circuit: cirq.Circuit,
+            repeated_bloq: Repeat
+            ) -> bool:
+        '''
+            Tests equality for generator decompose
+        '''
+        # Test for equality
+        return all(
+            map(
+                lambda x: x[0] == x[1],
+                zip(
+                    generator_decompose(repeated_bloq),
+                    generator_decompose(repeated_circuit)
+                )
+            )
+        )
+
+    @staticmethod
+    def circuit_equality(
+            repeated_circuit: cirq.Circuit,
+            repeated_bloq: Repeat,
+            decomp: int = 1
+            ) -> bool:
+        '''
+            Tests circuits for equality, moment by moment
+            :: repeated_circuit : cirq.Circuit :: Repeated Circuit Object
+            :: repeated_bloq : Repeat :: Repeating Bloq Object
+            :: decomp : int :: Number of decompositions for the decomp_multi
+        '''
+        return all(
+            map(
+                lambda x: x[0] == x[1],
+                zip(
+                    repeated_circuit,
+                    circuit_decompose_multi(repeated_bloq, decomp)
+                )
+            )
+        )
+
+    @staticmethod
+    def generator_commutative_equality(
+            repeated_circuit: cirq.Circuit,
+            repeated_bloq: Repeat
+            ) -> bool:
+        '''
+            Tests equality for generator decompose
+            This resolves issues where the gates are out of order but commute
+            :: repeated_circuit : cirq.Circuit :: Repeated Circuit Object
+            :: repeated_bloq : Repeat :: Repeating Bloq Object
+        '''
+        backlog = []
+        # Tracks the iterator for the decomposition of the circuit
+        gen = generator_decompose(repeated_circuit)
+
+        # Tracks the iterator for the decomposition of the repeating bloq
+        # Not the happiest with the amount of GOTO-like structures here, but
+        # Python for loops lack grace
+        for bloq_gate in generator_decompose(repeated_bloq):
+
+            qubits = bloq_gate.qubits
+            found = False
+
+            # First check any backlogged gates
+            for cmp in backlog:
+                if any(i in cmp.qubits for i in qubits):
+                    # Gate resolution is out of order, bail
+                    if cmp != bloq_gate:
+                        return False
+                    found = cmp
+                    break
+
+            # Gate was in commutative order in the backlog, continue
+            if found is not False:
+                backlog.remove(found)
+                continue
+
+            # Gate was not in the backlog
+            # Traverse the generator until we find the appropriate gate
+            for cmp in gen:
+
+                # Gate resolution is out of order, bail
+                if any(i in cmp.qubits for i in qubits):
+                    if cmp != bloq_gate:
+                        return False
+                    found = True
+                    break
+
+                # Append non-matching gates to the backlog
+                backlog.append(cmp)
+
+            if not found:
+                return False
+
+        # All gates were matched in order
+        return True
+
+    def test_cirq_unary_gate(self, n_qubits=10):
+
+        q = [cirq.LineQubit(i) for i in range(n_qubits)]
+        target_gate = cirq.H
+        gate = Parameterised(target_gate) 
+
+        for i in range(n_qubits): 
+            gate.bind_params(q[i])
+            assert next(gate.compose()) == target_gate(q[i]) 
+
+    def test_cirq_binary_gate(self, n_qubits=10):
+        '''
+            Tests multiple arguments
+        '''
+        q = [cirq.LineQubit(i) for i in range(n_qubits)]
+        target_gate = cirq.CNOT
+        gate = Parameterised(target_gate) 
+       
+        for i in range(n_qubits - 1): 
+            gate.bind_params(q[i], q[i + 1])
+            assert next(gate.compose()) == target_gate(q[i], q[i] + 1) 
+
+
+    def test_cirq_partial_binary_gate(self, n_qubits=10):
+        '''
+            Tests multiple arguments
+            This test pre-binds some gate arguments
+        '''
+        q = [cirq.LineQubit(i) for i in range(n_qubits)]
+        target_gate = cirq.ZPowGate
+
+        targ = q[n_qubits - 1]
+
+        def param_gate(gate, *args, **gate_kwargs):
+            return gate(**gate_kwargs)(*args)
+
+        gate = Parameterised(
+            partial(param_gate, cirq.ZPowGate),
+            targ
+        ) 
+       
+        for i in range(n_qubits - 1): 
+            gate.bind_params(exponent=i)
+            assert next(gate.compose()) == target_gate(exponent=i)(targ)
+
+    def test_bloq(self, n_qubits=4, n_repetitions=2):
+        
+        circ = self.generate_bloqs(n_qubits=n_qubits, n_repetitions=n_repetitions)
+        param = Parameterised(
+                    self.generate_bloqs 
+                )
+        param.bind_params(n_repetitions=2, n_qubits=n_qubits) 
+      
+        assert self.generator_commutative_equality(
+            circ.to_cirq_circuit(),
+            next(param.compose()).to_cirq_circuit()
+        )
+        
+    def test_repeat_bloq(self,  n_qubits: int = 4, n_repetitions: int = 3):
+        '''
+            Test wrapping a cirq.Circuit in a Param
+            The whole circuit is generated by the wrapping function
+        '''
+        circ = self.generate_circuit(n_qubits=n_qubits) 
+        bloq = Parameterised(Repeat, circ)
+
+        for i in range(n_repetitions):
+            repeated_circuit = self.generate_circuit(n_qubits=n_qubits, n_repetitions=i)
+            repeat_bloq = Repeat(circ, n_repetitions=i)
+
+            bloq.bind_params(n_repetitions=i)
+            param_bloq = bloq.compose()
+
+            # Test generator_decompose and circuit_decompose_multi
+            assert self.generator_commutative_equality(
+                repeated_circuit,
+                repeat_bloq
+            )
+
+            # Test generator_decompose and circuit_decompose_multi
+            assert self.generator_commutative_equality(
+                repeated_circuit,
+                param_bloq,
+            )
+
+            assert self.circuit_equality(
+                repeated_circuit,
+                repeat_bloq
+            )
+
+            assert self.circuit_equality(
+                repeated_circuit,
+                param_bloq
+            )
+
+# Test runner without invoking subprocesses
+# Used for interactive and pdb hooks
+if __name__ == '__main__':
+
+    tst = TestParamBloq()
+
+    # Extract test functions from tst object
+    for prop in dir(tst):
+        if prop[:4] == 'test':
+            obj = getattr(tst, prop)
+            if issubclass(type(obj), types.MethodType):
+                obj()
