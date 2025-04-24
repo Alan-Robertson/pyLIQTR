@@ -1,6 +1,8 @@
-
-from typing import Dict, Iterator, Generator 
-from types import FunctionType
+'''
+    meta_bloq.py
+    Base class for bloqs with meta compositions
+'''
+from typing import Dict, Iterator, Generator
 from numpy.typing import NDArray
 
 import cirq
@@ -8,27 +10,30 @@ import qualtran
 from qualtran._infra.gate_with_registers import GateWithRegisters
 from qualtran._infra.registers import Signature
 
+
 class MetaBloq(GateWithRegisters):
     '''
-        Meta Bloq Tag 
-        Abstract bloq for meta instructions     
+        Meta Bloq Tag
+        Abstract bloq for meta instructions
     '''
     @property
     def signature(self) -> Signature:
         '''
             Signature is instantiated after resolution
         '''
-        pass
 
     def compose(self, *args, **kwargs) -> Generator[
             qualtran.Bloq | cirq.Gate | cirq.Circuit,
             None,
             None
             ]:
-        raise NotImplementedError("Implemented by child class") 
+        '''
+            Internal composition function for overloading by derived classes
+        '''
+        raise NotImplementedError("Implemented by child class")
 
     def __str__(self) -> Exception:
-        raise NotImplementedError("Implemented by child class") 
+        raise NotImplementedError("Implemented by child class")
 
     def build_composite_bloq(
             self,
@@ -49,7 +54,7 @@ class MetaBloq(GateWithRegisters):
         **quregs: NDArray[cirq.Qid]
     ) -> Iterator[cirq.OP_TREE]:
         '''
-            Call decompose from the composition object 
+            Call decompose from the composition object
         '''
         for op in self.compose():
             ops = op.decompose_from_registers(*args, context, quregs)
@@ -61,6 +66,9 @@ class MetaBloq(GateWithRegisters):
             None,
             None
             ]:
+        '''
+            Generic decomposition wrapper calling the internal compose
+        '''
         # Actually passing this into the decomposition depends on the decomp
         if context is None:
             context = cirq.DecompositionContext(
@@ -78,11 +86,10 @@ class MetaBloq(GateWithRegisters):
         Instantiates against an abstract method
         These qubit counts only account for non-ancillae qubits
         '''
-        pass 
 
     def __iter__(self) -> Generator[
             qualtran.Bloq | cirq.Gate | cirq.Circuit,
             None,
             None
             ]:
-        return self.compose() 
+        return self.compose()
