@@ -321,7 +321,7 @@ class ParamMap(MetaBloq):
             :: caching : bool :: Whether the repeated object should be cached
             :: quregs : dict :: Map back to cirq qubit labels for qualtran bloq
         '''
-        self.sequence = sequence
+        self.sequence = gate_sequence
         self.parameters = parameters
 
         self.kwargs = kwargs 
@@ -355,12 +355,18 @@ class ParamMap(MetaBloq):
         return soqs
 
     @staticmethod
-    def infer_params(params):
-        # TODO
-        if len(params) == 2:
-            if isinstance(params[1], dict):  
-                return params 
-        pass
+    def infer_params(*params):
+        args = []
+        kwargs = {}
+
+        for param in params:
+            if isinstance(param, dict): 
+                kwargs |= param
+            elif isinstance(param, list):
+                args += param
+            else: 
+                args.append(param)
+        return args, kwargs
 
     def compose(self) -> Generator[
             qualtran.Bloq | cirq.Gate | cirq.Circuit,
@@ -373,29 +379,52 @@ class ParamMap(MetaBloq):
         '''
         cache_idx = 0
         params = iter(self.parameters)
-        for idx, bloq in enumerate(self.sequence):
+        for bloq in self.sequence:
 
-            # Collect Parameterised Tags
-            if isinstance(bloq, Parameterised):
-                args, kwargs = self.infer_params(next(params))
-                bloq.bind_params(*args, **kwargs)
-                for seq in bloq.compose():
-                    yield seq
+            # Special handling for flattening generators 
+            if isinstance(bloq, Generator):
+                for subbloq in bloq: 
+                    yield self.resolve_params(subbloq, params, cache_idx)
+                    cache_idx += 1
 
-                if self.caching:
-                    self.cache_state.append(False)
-                    self.cache.append(None)
+            else: # Non-generator
+                yield self.resolve_params(bloq, params, cache_idx)
+                cache_idx += 1
 
-            else:  # Not Parameterised 
+    def resolve_params(self, bloq, params, cache_idx) -> qualtran.Bloq | cirq.Gate | cirq.Circuit:
+        '''
+            Helper function for resolving params
+        '''
+        # Collect Parameterised Tags
+        if isinstance(bloq, Parameterised):
 
-                # Cache undiscovered object
-                if self.caching: 
+            # Infer params 
+            args, kwargs = self.infer_params(next(params))
+            
+            # Bind params to bloq instance 
+            bloq.bind_params(*args, **kwargs)
 
-                    if (idx < len(self.cache_state) and self.cache_state[idx] is True):
-                        yield self.cache[idx]
-                        continue
+            for seq in bloq.compose():
+                return seq
 
-                    self.cache.append(bloq)
-                    self.cache_state.append(True)
+            if self.caching:
+                self.cache_state.append(False)
+                self.cache.append(None)
 
-                yield bloq
+        else:  # Not Parameterised 
+            # Cache undiscovered object
+            if self.caching: 
+
+                if (cache_idx < len(self.cache_state) and self.cache_state[cache_idx] is True):
+                    return self.cache[cache_idx]
+
+                self.cache.append(bloq)
+                self.cache_state.append(True)
+
+            return bloq
+    
+    def append(self, bloq: qualtran.Bloq | cirq.Gate | cirq.Circuit):
+        '''
+            Adds another gate to the sequence
+        '''
+        self.sequence.append(bloq)

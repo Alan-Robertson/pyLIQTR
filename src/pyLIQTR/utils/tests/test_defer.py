@@ -1,5 +1,5 @@
 '''
-    Tests for the Param Bloq
+    Tests for the Deferred Bloq
 '''
 import types
 import unittest
@@ -19,7 +19,7 @@ from pyLIQTR.utils.tests.test_helpers import TestHelpers, extract_and_run_tests
 
 class TestDeferredBloq(unittest.TestCase, TestHelpers):
     '''
-        Tests for the Repeat Bloq
+        Tests for the Deferred Bloq
     '''
 
     @staticmethod
@@ -111,14 +111,16 @@ class TestDeferredBloq(unittest.TestCase, TestHelpers):
     def test_bloq(self, n_qubits=4, n_repetitions=2):
         
         circ = self.generate_bloqs(n_qubits=n_qubits, n_repetitions=n_repetitions)
-        param = Parameterised(
-                    self.generate_bloqs 
+
+        defer = Deferred(
+                    self.generate_bloqs, 
+                    n_repetitions=2,
+                    n_qubits=n_qubits
                 )
-        param.bind_params(n_repetitions=2, n_qubits=n_qubits) 
       
         assert self.generator_commutative_equality(
             circ.to_cirq_circuit(),
-            next(param.compose()).to_cirq_circuit()
+            defer
         )
         
     def test_repeat_bloq(self,  n_qubits: int = 4, n_repetitions: int = 3):
@@ -161,4 +163,4 @@ class TestDeferredBloq(unittest.TestCase, TestHelpers):
 # Test runner without invoking subprocesses
 # Used for interactive and pdb hooks
 if __name__ == '__main__':
-    extract_and_run_tests(TestParamBloq())
+    extract_and_run_tests(TestDeferredBloq())

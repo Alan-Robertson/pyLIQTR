@@ -1,6 +1,6 @@
 '''
     deferred.py
-    Meta Bloqs that defer instantiation
+    Bloqs that defer instantiation
 '''
 from typing import Dict, Iterator, Generator
 from types import FunctionType
