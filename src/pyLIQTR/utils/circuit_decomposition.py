@@ -7,6 +7,8 @@ import cirq
 import qualtran
 from cirq.ops.gate_operation import GateOperation
 
+from qualtran.cirq_interop._bloq_to_cirq import BloqAsCirqGate 
+
 import cirq.protocols.decompose_protocol as cpdp
 from typing import (
     TYPE_CHECKING,
@@ -193,7 +195,7 @@ def generator_decompose(
         )
     sys.setrecursionlimit(min([reclim*100,100000]))
     for op in _controlled_decompose_dfs(0,max_decomposition_passes, val, args):
-        if isinstance(op.gate,qualtran.cirq_interop._bloq_to_cirq.BloqAsCirqGate):
+        if isinstance(op.gate, BloqAsCirqGate):
             if "qualtran.bloqs.basic_gates" in op._gate.__module__:
                 yield op._gate.cirq_gate.on(*op.qubits)
             elif "qualtran.cirq_interop._bloq_to_cirq" in op._gate.__module__:

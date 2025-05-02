@@ -1,6 +1,6 @@
 '''
     deferred.py
-    Meta Bloqs that defer instantiation
+    Bloqs that defer instantiation
 '''
 from typing import Dict, Iterator, Generator
 from types import FunctionType
@@ -124,9 +124,7 @@ class Cached(MetaBloq):
                 *self.args,
                 **self.kwargs
             )
-            print("Storing in Cache:", bloq)
             Cached.SINGLETON_CACHE[self.tag] = bloq
             yield bloq
         else:
-            print("Retrieving from Cache:", cache_entry)
             yield cache_entry

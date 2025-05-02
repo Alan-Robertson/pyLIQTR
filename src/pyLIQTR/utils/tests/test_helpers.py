@@ -3,6 +3,7 @@
 '''
 
 import types
+import typing
 import unittest
 
 import cirq
@@ -24,78 +25,90 @@ def extract_and_run_tests(tst: unittest.TestCase):
                 obj()
 
 class TestHelpers():
+    '''
+        Class containing static methods for comparisons between decomposed  
+        bloqs and circuits
+    '''
+
+    @staticmethod
+    def non_empty(iterable: typing.Iterable) -> bool:
+        try:
+            next(iterable)
+            return True
+        except StopIteration:
+            return False
 
     @staticmethod
     def generator_equality(
-            repeated_circuit: cirq.Circuit,
-            repeated_bloq: CompositeBloq 
+            circuit: cirq.Circuit,
+            bloq: CompositeBloq 
             ) -> bool:
         '''
             Tests equality for generator decompose
         '''
-        try:
-            # Raises StopIteration if either are empty 
-            next(
-                zip(
-                    generator_decompose(repeated_bloq),
-                    generator_decompose(repeated_circuit)
-                )
-            )
-        except:
-            assert False 
+        # Test that the bloq is not empty
+        assert TestHelpers.non_empty(generator_decompose(bloq))
 
-        # Test for equality
+        # Test that all decomposition objects match  
         return all(
             map(
                 lambda x: x[0] == x[1],
                 zip(
-                    generator_decompose(repeated_bloq),
-                    generator_decompose(repeated_circuit)
+                    generator_decompose(bloq),
+                    generator_decompose(circuit)
                 )
             )
         )
 
     @staticmethod
     def circuit_equality(
-            repeated_circuit: cirq.Circuit,
-            repeated_bloq: CompositeBloq,
+            circuit: cirq.Circuit,
+            bloq: CompositeBloq,
             decomp: int = 1
             ) -> bool:
         '''
             Tests circuits for equality, moment by moment
-            :: repeated_circuit : cirq.Circuit :: Repeated Circuit Object
-            :: repeated_bloq : Repeat :: Repeating Bloq Object
+            :: circuit : cirq.Circuit :: Repeated Circuit Object
+            :: bloq : Repeat :: Repeating Bloq Object
             :: decomp : int :: Number of decompositions for the decomp_multi
         '''
+        # Test that the bloq is not empty
+        assert TestHelpers.non_empty(iter(circuit_decompose_multi(bloq, decomp)))
+    
+        # Test that all decomposition objects match 
         return all(
             map(
                 lambda x: x[0] == x[1],
                 zip(
-                    repeated_circuit,
-                    circuit_decompose_multi(repeated_bloq, decomp)
+                    circuit,
+                    circuit_decompose_multi(bloq, decomp)
                 )
             )
         )
 
     @staticmethod
     def generator_commutative_equality(
-            repeated_circuit: cirq.Circuit,
-            repeated_bloq: CompositeBloq 
+            circuit: cirq.Circuit,
+            bloq: CompositeBloq 
             ) -> bool:
         '''
             Tests equality for generator decompose
             This resolves issues where the gates are out of order but commute
-            :: repeated_circuit : cirq.Circuit :: Repeated Circuit Object
-            :: repeated_bloq : Repeat :: Repeating Bloq Object
+            :: circuit : cirq.Circuit :: Repeated Circuit Object
+            :: bloq : Repeat :: Repeating Bloq Object
         '''
+
+        # Test that the bloq is not empty
+        assert TestHelpers.non_empty(generator_decompose(bloq))
+
         backlog = []
         # Tracks the iterator for the decomposition of the circuit
-        gen = generator_decompose(repeated_circuit)
+        gen = generator_decompose(circuit)
 
         # Tracks the iterator for the decomposition of the repeating bloq
-        # Not the happiest with the amount of GOTO-like structures here, but
+        # Not the happiest with the amount of GOTO-like structures here;
         # Python for loops lack grace
-        for bloq_gate in generator_decompose(repeated_bloq):
+        for bloq_gate in generator_decompose(bloq):
 
             qubits = bloq_gate.qubits
             found = False
@@ -133,3 +146,4 @@ class TestHelpers():
 
         # All gates were matched in order
         return True
+

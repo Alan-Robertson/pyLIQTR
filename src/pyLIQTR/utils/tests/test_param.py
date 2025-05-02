@@ -71,11 +71,28 @@ class TestParamBloq(unittest.TestCase, TestHelpers):
 
         q = [cirq.LineQubit(i) for i in range(n_qubits)]
         target_gate = cirq.H
-        gate = Parameterised(target_gate) 
+        bloq = Parameterised(target_gate) 
 
         for i in range(n_qubits): 
-            gate.bind_params(q[i])
-            assert next(gate.compose()) == target_gate(q[i]) 
+            # This function is invoked internally in the ParamMapBloq
+            bloq.bind_params(q[i])
+
+            # Test the bloq compose
+            assert next(bloq.compose()) == target_gate(q[i]) 
+
+            # Test the pyLIQTR decomposers
+            circuit = cirq.Circuit()
+            circuit.append(target_gate(q[i]))
+
+            # Test generator_decompose and circuit_decompose_multi
+            assert self.generator_commutative_equality(
+                circuit,
+                bloq
+            )
+            assert self.circuit_equality(
+                circuit,
+                bloq
+            )
 
     def test_cirq_binary_gate(self, n_qubits=10):
         '''
@@ -83,12 +100,28 @@ class TestParamBloq(unittest.TestCase, TestHelpers):
         '''
         q = [cirq.LineQubit(i) for i in range(n_qubits)]
         target_gate = cirq.CNOT
-        gate = Parameterised(target_gate) 
+        bloq = Parameterised(target_gate) 
        
         for i in range(n_qubits - 1): 
-            gate.bind_params(q[i], q[i + 1])
-            assert next(gate.compose()) == target_gate(q[i], q[i] + 1) 
 
+            # Test the block internal composition
+            args = (q[i], q[i + 1]) 
+            bloq.bind_params(*args)
+            assert next(bloq.compose()) == target_gate(*args) 
+
+            # Test the pyLIQTR decomposers
+            circuit = cirq.Circuit()
+            circuit.append(target_gate(*args))
+
+            # Test generator_decompose and circuit_decompose_multi
+            assert self.generator_commutative_equality(
+                circuit,
+                bloq
+            )
+            assert self.circuit_equality(
+                circuit,
+                bloq
+            )
 
     def test_cirq_partial_binary_gate(self, n_qubits=10):
         '''
@@ -100,17 +133,33 @@ class TestParamBloq(unittest.TestCase, TestHelpers):
 
         targ = q[n_qubits - 1]
 
+        # Wrapper function to redirect args appropriately
         def param_gate(gate, *args, **gate_kwargs):
             return gate(**gate_kwargs)(*args)
 
-        gate = Parameterised(
+        # Paramterise a partial function
+        bloq = Parameterised(
             partial(param_gate, cirq.ZPowGate),
             targ
         ) 
        
         for i in range(n_qubits - 1): 
-            gate.bind_params(exponent=i)
-            assert next(gate.compose()) == target_gate(exponent=i)(targ)
+            bloq.bind_params(exponent=i)
+            assert next(bloq.compose()) == target_gate(exponent=i)(targ)
+
+            # Test the pyLIQTR decomposers
+            circuit = cirq.Circuit()
+            circuit.append(target_gate(exponent=i)(targ))
+
+            # Test generator_decompose and circuit_decompose_multi
+            assert self.generator_commutative_equality(
+                circuit,
+                bloq
+            )
+            assert self.circuit_equality(
+                circuit,
+                bloq
+            )
 
     def test_bloq(self, n_qubits=4, n_repetitions=2):
         
@@ -133,33 +182,34 @@ class TestParamBloq(unittest.TestCase, TestHelpers):
         circ = self.generate_circuit(n_qubits=n_qubits) 
         bloq = Parameterised(Repeat, circ)
 
-        for i in range(n_repetitions):
-            repeated_circuit = self.generate_circuit(n_qubits=n_qubits, n_repetitions=i)
+        for i in range(1, n_repetitions):
+            repeat_circuit = self.generate_circuit(n_qubits=n_qubits, n_repetitions=i)
             repeat_bloq = Repeat(circ, n_repetitions=i)
 
             bloq.bind_params(n_repetitions=i)
-            param_bloq = bloq.compose()
 
             # Test generator_decompose and circuit_decompose_multi
             assert self.generator_commutative_equality(
-                repeated_circuit,
+                repeat_circuit,
                 repeat_bloq
             )
 
             # Test generator_decompose and circuit_decompose_multi
             assert self.generator_commutative_equality(
-                repeated_circuit,
-                param_bloq,
+                repeat_circuit,
+                bloq,
             )
 
             assert self.circuit_equality(
-                repeated_circuit,
-                repeat_bloq
+                repeat_circuit,
+                repeat_bloq,
+                decomp = 2
             )
 
             assert self.circuit_equality(
-                repeated_circuit,
-                param_bloq
+                repeat_circuit,
+                bloq,
+                decomp = 2 # Needs two rounds of decomposition
             )
 
 # Test runner without invoking subprocesses
