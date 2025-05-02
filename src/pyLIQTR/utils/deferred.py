@@ -35,8 +35,8 @@ class Deferred(MetaBloq):
         '''
         self.subbloq_gen = subbloq_gen
 
-        self.args = None
-        self.kwargs = None
+        self.args = args 
+        self.kwargs = kwargs 
 
     @property
     def signature(self) -> Signature:
@@ -93,8 +93,8 @@ class Cached(MetaBloq):
         self.tag = tag
         self.subbloq_gen = subbloq_gen
 
-        self.args = None
-        self.kwargs = None
+        self.args = args 
+        self.kwargs = kwargs 
 
     @property
     def signature(self) -> Signature:
@@ -124,7 +124,9 @@ class Cached(MetaBloq):
                 *self.args,
                 **self.kwargs
             )
+            print("Storing in Cache:", bloq)
             Cached.SINGLETON_CACHE[self.tag] = bloq
             yield bloq
         else:
+            print("Retrieving from Cache:", cache_entry)
             yield cache_entry
