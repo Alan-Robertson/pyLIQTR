@@ -131,12 +131,10 @@ class TestParamMapBloq(unittest.TestCase, TestHelpers):
                 operations(qubits) 
         )
 
-
         assert self.circuit_equality(
             circuit,
             bloq
         )
-
 
 # Test runner without invoking subprocesses
 # Used for interactive and pdb hooks
