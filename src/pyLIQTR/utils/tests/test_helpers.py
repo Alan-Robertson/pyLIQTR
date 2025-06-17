@@ -7,7 +7,9 @@ import typing
 import unittest
 
 import cirq
-from qualtran import CompositeBloq
+from qualtran import CompositeBloq, Register, QBit, BloqBuilder, Bloq, Signature
+from qualtran._infra.gate_with_registers import GateWithRegisters
+
 
 from pyLIQTR.utils.circuit_decomposition import circuit_decompose_multi
 from pyLIQTR.utils.circuit_decomposition import generator_decompose
@@ -147,3 +149,68 @@ class TestHelpers():
         # All gates were matched in order
         return True
 
+    @staticmethod
+    def naive_compose_bloqs(n_regs, *bloqs):
+        '''
+         Composes bloqs together
+         This is a naive method that serves to test composite bloqs
+        '''
+        regs = [Register(f'q{i}', dtype=QBit()) for i in range(n_regs)] 
+        soquets = [None for _ in range(n_regs)]
+
+        bb = BloqBuilder()
+        for i, reg in enumerate(regs):
+            soquets[i] = bb.add_register(reg)
+
+        for bloq in bloqs:
+            n_args = len(list(bloq.signature.lefts()))
+            bindings = {reg.name:arg for reg, arg in zip(bloq.signature.lefts(), soquets)}
+            soquets[:n_args] = bb.add(bloq, **bindings) 
+
+        cbloq = bb.finalize(**{reg.name:soquet for reg, soquet in zip(regs, soquets)})
+        return cbloq
+
+
+    @staticmethod
+    def naive_decomposable_bloq(n_regs, *bloqs):
+        '''
+            Factory for decomposable bloqs
+        '''
+        class NaiveDecomposableBloq(GateWithRegisters):
+
+            # Placeholders
+            n_regs = None 
+            bloqs = None 
+
+            @property
+            def signature(self):
+                return Signature(
+                        [Register(f'q{i}', dtype=QBit()) for i in range(self.n_regs)]
+                       )
+
+            def build_composite_bloq(
+                self,
+                bb: BloqBuilder,
+                **kwargs):
+                '''
+                 Composes bloqs together
+                 This is a naive method that serves to test composite bloqs
+                '''
+                regs = [Register(f'q{i}', dtype=QBit()) for i in range(self.n_regs)] 
+                soquets = [kwargs[reg.name] for reg in regs]
+
+                for bloq in self.bloqs:
+                    n_args = len(list(bloq.signature.lefts()))
+                    bindings = {reg.name:arg for reg, arg in zip(bloq.signature.lefts(), soquets)}
+                    soquets[:n_args] = bb.add(bloq, **bindings) 
+
+                return {reg.name:soquet for reg, soquet in zip(regs, soquets)}
+
+            def _decompose_with_context_(self, *, context=None, **kwargs):
+                yield from self.bloqs
+
+        # Inject class objects
+        NaiveDecomposableBloq.n_regs = n_regs
+        NaiveDecomposableBloq.bloqs = list(bloqs)
+
+        return NaiveDecomposableBloq

@@ -8,7 +8,7 @@ from functools import partial
 
 import cirq
 from qualtran import CompositeBloq
-from pyLIQTR.utils.deferred import Deferred 
+from pyLIQTR.utils.deferred import Deferred
 from pyLIQTR.utils.repeat import circuit_to_quregs
 
 from pyLIQTR.utils.circuit_decomposition import circuit_decompose_multi
@@ -18,6 +18,7 @@ from pyLIQTR.utils.tests.test_helpers import TestHelpers, extract_and_run_tests
 
 from qualtran.bloqs.basic_gates import CNOT, Hadamard
 from qualtran import BloqBuilder
+from qualtran._infra.registers import Register, QBit
 
 
 class TestDeferredBloq(unittest.TestCase, TestHelpers):
@@ -48,11 +49,10 @@ class TestDeferredBloq(unittest.TestCase, TestHelpers):
     def generate_bloqs(
         *,
         n_repetitions: int = 1,
-        n_qubits: int = 2
+        n_qubits: int = 2,
+        CX = CNOT(),
+        H = Hadamard(),
         ) -> None:
-
-        CX = CNOT()
-        H = Hadamard()
 
         bb = BloqBuilder() 
 
@@ -87,6 +87,10 @@ class TestDeferredBloq(unittest.TestCase, TestHelpers):
         for i in range(n_qubits - 1): 
             gate = Deferred(target_gate, q[i], q[i + 1])
             assert next(gate.compose()) == target_gate(q[i], q[i] + 1) 
+
+    def test_bloq(self):
+        bloq = Hadamard()
+        regs = [Register('q0', dtype=QBit())]
 
 # Test runner without invoking subprocesses
 # Used for interactive and pdb hooks

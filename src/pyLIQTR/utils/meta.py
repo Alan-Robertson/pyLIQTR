@@ -21,6 +21,7 @@ class MetaBloq(GateWithRegisters):
         '''
             Signature is instantiated after resolution
         '''
+        return self._ordered_arguments()
 
     def compose(self, *args, **kwargs) -> Generator[
             qualtran.Bloq | cirq.Gate | cirq.Circuit,
@@ -34,6 +35,13 @@ class MetaBloq(GateWithRegisters):
 
     def __str__(self) -> Exception:
         raise NotImplementedError("Implemented by child class")
+
+    def _ordered_arguments(self) -> Signature:
+        '''
+            Workaround for signature schemes
+            Generates a signature corresponding to a fixed number of qubit inputs and outputs 
+        '''
+        pass
 
     def build_composite_bloq(
             self,
@@ -93,3 +101,13 @@ class MetaBloq(GateWithRegisters):
             None
             ]:
         return self.compose()
+
+    @staticmethod
+    def bb_ordered_insert(bb, bloq, *args):
+        '''
+            Forces addition on argument order 
+            This would be nice if the signature supported strict ordering  
+        '''
+        sig_args = tuple(bloq.signature.lefts())
+        vals = bb.add(bloq, **{sig_arg.name:arg for sig_arg, arg in zip(sig_args, args)})
+        return vals

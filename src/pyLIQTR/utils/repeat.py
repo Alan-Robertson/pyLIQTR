@@ -10,7 +10,8 @@ from numpy.typing import NDArray
 import cirq
 import qualtran
 from qualtran._infra.gate_with_registers import GateWithRegisters
-from qualtran._infra.registers import Signature
+from qualtran._infra.registers import Signature, Register, QBit
+
 
 from pyLIQTR.utils.meta import MetaBloq 
 
@@ -64,15 +65,20 @@ class Repeat(MetaBloq):
         # Dynamic dispatch
         # Sets different decomposers depending on the input
         self._decompose = None
+        self._signature = None
+        self._cached_signature = None
 
         if issubclass(type(subbloq), qualtran.Bloq):
             self._decompose = self._qualtran_bloq_decomp
+            self._signature = self._qualtran_signature
 
         elif issubclass(type(subbloq), cirq.Gate):
             self._decompose = self._cirq_gate_decomp
+            self._signature = self._cirq_gate_signature
 
         elif issubclass(type(subbloq), cirq.Circuit):
             self._decompose = self._cirq_circuit_decomp
+            self._signature = self._cirq_circuit_signature
 
         else:
             raise TypeError(
@@ -85,7 +91,24 @@ class Repeat(MetaBloq):
             Signature is directly inherited from the subbloq
             May throw errors if the subbloq lacks a signature
         '''
+        if self._cached_signature is None: 
+            self._cached_signature = self._signature()
+        return self._cached_signature
+
+    def _qualtran_signature(self) -> Signature:
         return self.subbloq.signature
+
+    def _cirq_circuit_signature(self) -> Signature:
+        signature = Signature(
+            [Register(f'q{i}', dtype=QBit()) for i, _ in enumerate(self.subbloq.all_qubits())]
+            )
+        return signature 
+
+    def _cirq_gate_signature(self) -> Signature: 
+        signature = Signature(
+            [Register(f'q{i}', dtype=QBit()) for i, _ in enumerate(self.subbloq.qubits)]
+            )
+        return signature
 
     def __str__(self) -> str:
         '''

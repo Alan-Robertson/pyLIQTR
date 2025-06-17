@@ -119,7 +119,69 @@ class TestRepeatBloq(unittest.TestCase, TestHelpers):
             repeat_bloq
         )
 
-# Test runner without invoking subprocesses
-# Used for interactive and pdb hooks
+
+    def test_bloq_repeat(self, n_repetitions: int = 2, n_qubits: int = 3):
+        '''
+            Test wrapping a repeat bloq in a CompositeBloq 
+        '''
+        # Single instance of the circuit
+        circ = self.generate_circuit(n_qubits=n_qubits)
+                                                                # Test runner without invoking subprocesses
+        # Baseline repeated circuit to test against            
+        # We will be adding two repeat bloqs to the composition
+        # So this should be twice the number of repetitions 
+        repeated_circuit = self.generate_circuit(              
+            n_repetitions=n_repetitions * 2,
+            n_qubits=n_qubits
+        )
+                                                                
+        # Repeated circuit representation
+        repeat_bloq = Repeat(circ, n_repetitions=n_repetitions)
+        
+        # Confirm that these objects are identical 
+        cbloq = TestHelpers.naive_decomposable_bloq(n_qubits, repeat_bloq, repeat_bloq)
+
+        # Test generator_decompose and circuit_decompose_multi
+        assert self.generator_commutative_equality(
+            repeated_circuit,
+            cbloq()
+        )
+        assert self.circuit_equality(
+            repeated_circuit,
+            cbloq() 
+        )
+
+
+    def test_bloq_repeat_many(self, n_repetitions: int = 4, n_qubits: int = 7):
+        '''
+            Test wrapping a repeat bloq in a CompositeBloq 
+        '''
+        # Single instance of the circuit
+        circ = self.generate_circuit(n_qubits=n_qubits)
+                                                                # Test runner without invoking subprocesses
+        # Baseline repeated circuit to test against            
+        # We will be adding two repeat bloqs to the composition
+        # So this should be twice the number of repetitions 
+        repeated_circuit = self.generate_circuit(              
+            n_repetitions=n_repetitions * 2,
+            n_qubits=n_qubits
+        )
+                                                                
+        # Repeated circuit representation
+        repeat_bloq = Repeat(circ, n_repetitions=n_repetitions)
+        
+        # Confirm that these objects are identical 
+        cbloq = TestHelpers.naive_decomposable_bloq(n_qubits, repeat_bloq, repeat_bloq)
+
+        # Test generator_decompose and circuit_decompose_multi
+        assert self.generator_commutative_equality(
+            repeated_circuit,
+            cbloq()
+        )
+        assert self.circuit_equality(
+            repeated_circuit,
+            cbloq() 
+        )
+
 if __name__ == '__main__':
     extract_and_run_tests(TestRepeatBloq())

@@ -9,19 +9,24 @@ from numpy.typing import NDArray
 import cirq
 import qualtran
 from qualtran._infra.gate_with_registers import GateWithRegisters
-from qualtran._infra.registers import Signature
+from qualtran._infra.registers import Signature, Register, QBit
+
 
 from pyLIQTR.utils.meta import MetaBloq
+
 
 class Deferred(MetaBloq):
     '''
         This Bloq exists to defer instantiation
+        It is also possible to pass a generating function into this block 
+        in lieu of a constructor
     '''
-
     def __init__(
                 self,
                 subbloq_gen: FunctionType,
                 *args,
+                registers: Register = None,
+                n_thru_registers: int = None,
                 caching: bool = False,
                 **kwargs
             ):
@@ -32,8 +37,19 @@ class Deferred(MetaBloq):
             :: caching : bool :: Whether the repeated object should be cached
             :: quregs : dict :: Map back to cirq qubit labels for qualtran bloq
             :: **kwargs :: Kwargs to the deferred bloq
+            :: registers : Register :: Register object 
+            :: n_thru_registers : init :: Generate an n qubit register signature 
         '''
         self.subbloq_gen = subbloq_gen
+
+        if n_thru_registers is not None:
+            registers = [Register(f'q{i}', dtype=QBit()) for i in range(n_thru_registers)]
+        self.registers = registers
+
+        if self.registers is not None:
+            self._signature = Signature(self.registers) 
+        else:
+            self._signature = None
 
         self.args = args 
         self.kwargs = kwargs 
@@ -43,7 +59,7 @@ class Deferred(MetaBloq):
         '''
             Signature is instantiated after resolution
         '''
-        pass
+        return self._signature
 
     def __str__(self) -> str:
         '''
