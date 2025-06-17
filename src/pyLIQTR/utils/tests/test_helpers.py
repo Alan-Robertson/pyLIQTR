@@ -6,11 +6,12 @@ import types
 import typing
 import unittest
 
+import numpy
 import cirq
 from qualtran import CompositeBloq, Register, QBit, BloqBuilder, Bloq, Signature
 from qualtran._infra.gate_with_registers import GateWithRegisters
 
-
+from pyLIQTR.utils.meta import MetaBloq
 from pyLIQTR.utils.circuit_decomposition import circuit_decompose_multi
 from pyLIQTR.utils.circuit_decomposition import generator_decompose
 
@@ -31,6 +32,15 @@ class TestHelpers():
         Class containing static methods for comparisons between decomposed  
         bloqs and circuits
     '''
+
+    @staticmethod
+    def consume(iterable: typing.Iterable):
+        '''
+            Forces evaluation of all elements in an iterable
+            Useful for stateful map operations without allocating memory 
+        '''
+        for _ in iterable:
+            pass
 
     @staticmethod
     def non_empty(iterable: typing.Iterable) -> bool:

@@ -24,6 +24,7 @@ from qualtran._infra.registers import Register, QBit
 class TestDeferredBloq(unittest.TestCase, TestHelpers):
     '''
         Tests for the Deferred Bloq
+        Delays instantiation of sub-bloq's initialisers 
     '''
 
     @staticmethod
@@ -42,7 +43,6 @@ class TestDeferredBloq(unittest.TestCase, TestHelpers):
             for i in range(n_qubits - 1):
                 circ.append(cirq.H(q[i]))
                 circ.append(cirq.CNOT(q[i], q[i + 1]))
-
         return circ
 
     @staticmethod
@@ -87,10 +87,6 @@ class TestDeferredBloq(unittest.TestCase, TestHelpers):
         for i in range(n_qubits - 1): 
             gate = Deferred(target_gate, q[i], q[i + 1])
             assert next(gate.compose()) == target_gate(q[i], q[i] + 1) 
-
-    def test_bloq(self):
-        bloq = Hadamard()
-        regs = [Register('q0', dtype=QBit())]
 
 # Test runner without invoking subprocesses
 # Used for interactive and pdb hooks
