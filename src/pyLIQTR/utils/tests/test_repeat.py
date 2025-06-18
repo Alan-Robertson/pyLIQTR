@@ -1,7 +1,6 @@
 '''
     Tests for the Repeat Bloq
 '''
-import types
 import unittest
 
 import cirq
@@ -9,16 +8,16 @@ from qualtran import CompositeBloq
 from pyLIQTR.utils.repeat import Repeat
 from pyLIQTR.utils.repeat import circuit_to_quregs
 
-from pyLIQTR.utils.circuit_decomposition import circuit_decompose_multi
 from pyLIQTR.utils.circuit_decomposition import generator_decompose
 
 from pyLIQTR.utils.tests.test_helpers import TestHelpers, extract_and_run_tests
+
 
 class TestRepeatBloq(unittest.TestCase, TestHelpers):
     '''
         Tests for the Repeat Bloq
     '''
-    
+
     def test_bloq(self, n_qubits: int = 5, n_repetitions: int = 7):
         '''
             Tests wrapping a CompositeBloq in a Repeat
@@ -100,26 +99,25 @@ class TestRepeatBloq(unittest.TestCase, TestHelpers):
             repeat_bloq
         )
 
-
     def test_bloq_repeat(self, n_repetitions: int = 2, n_qubits: int = 3):
         '''
-            Test wrapping a repeat bloq in a CompositeBloq 
+            Test wrapping a repeat bloq in a CompositeBloq
         '''
         # Single instance of the circuit
         circ = TestHelpers.generate_circuit(n_qubits=n_qubits)
-                                                                # Test runner without invoking subprocesses
-        # Baseline repeated circuit to test against            
+
+        # Baseline repeated circuit to test against
         # We will be adding two repeat bloqs to the composition
-        # So this should be twice the number of repetitions 
-        repeated_circuit = TestHelpers.generate_circuit(              
+        # So this should be twice the number of repetitions
+        repeated_circuit = TestHelpers.generate_circuit(
             n_repetitions=n_repetitions * 2,
             n_qubits=n_qubits
         )
-                                                                
+
         # Repeated circuit representation
         repeat_bloq = Repeat(circ, n_repetitions=n_repetitions)
-        
-        # Confirm that these objects are identical 
+
+        # Confirm that these objects are identical
         cbloq = TestHelpers.naive_decomposable_bloq(n_qubits, repeat_bloq, repeat_bloq)
 
         # Test generator_decompose and circuit_decompose_multi
@@ -129,29 +127,28 @@ class TestRepeatBloq(unittest.TestCase, TestHelpers):
         )
         assert self.circuit_equality(
             repeated_circuit,
-            cbloq() 
+            cbloq()
         )
-
 
     def test_bloq_repeat_many(self, n_repetitions: int = 4, n_qubits: int = 7):
         '''
-            Test wrapping a repeat bloq in a CompositeBloq 
+            Test wrapping a repeat bloq in a CompositeBloq
         '''
         # Single instance of the circuit
         circ = TestHelpers.generate_circuit(n_qubits=n_qubits)
-                                                                # Test runner without invoking subprocesses
-        # Baseline repeated circuit to test against            
+
+        # Baseline repeated circuit to test against
         # We will be adding two repeat bloqs to the composition
-        # So this should be twice the number of repetitions 
-        repeated_circuit = TestHelpers.generate_circuit(              
+        # So this should be twice the number of repetitions
+        repeated_circuit = TestHelpers.generate_circuit(
             n_repetitions=n_repetitions * 2,
             n_qubits=n_qubits
         )
-                                                                
+
         # Repeated circuit representation
         repeat_bloq = Repeat(circ, n_repetitions=n_repetitions)
-        
-        # Confirm that these objects are identical 
+
+        # Confirm that these objects are identical
         cbloq = TestHelpers.naive_decomposable_bloq(n_qubits, repeat_bloq, repeat_bloq)
 
         # Test generator_decompose and circuit_decompose_multi
@@ -161,8 +158,9 @@ class TestRepeatBloq(unittest.TestCase, TestHelpers):
         )
         assert self.circuit_equality(
             repeated_circuit,
-            cbloq() 
+            cbloq()
         )
+
 
 if __name__ == '__main__':
     extract_and_run_tests(TestRepeatBloq())
