@@ -6,15 +6,11 @@ import types
 import typing
 import unittest
 
-import numpy
 import cirq
-from qualtran import CompositeBloq, Register, QBit, BloqBuilder, Bloq, Signature
+from qualtran import CompositeBloq, Register, QBit, BloqBuilder, Signature
 from qualtran._infra.gate_with_registers import GateWithRegisters
 from qualtran.bloqs.basic_gates import CNOT, Hadamard
-from qualtran import BloqBuilder
 
-
-from pyLIQTR.utils.meta import MetaBloq
 from pyLIQTR.utils.circuit_decomposition import circuit_decompose_multi
 from pyLIQTR.utils.circuit_decomposition import generator_decompose
 
@@ -30,9 +26,10 @@ def extract_and_run_tests(tst: unittest.TestCase):
             if issubclass(type(obj), types.MethodType):
                 obj()
 
+
 class TestHelpers():
     '''
-        Class containing static methods for comparisons between decomposed  
+        Class containing static methods for comparisons between decomposed
         bloqs and circuits
     '''
 
@@ -55,46 +52,51 @@ class TestHelpers():
 
         return circ
 
-
     @staticmethod
     def generate_bloqs(
-        *,
-        n_repetitions: int = 1,
-        n_qubits: int = 2,
-        CNOT = CNOT,
-        Hadamard = Hadamard,
-        ) -> None:
+            *,
+            n_repetitions: int = 1,
+            n_qubits: int = 2,
+            cnot=CNOT,
+            hadamard=Hadamard,
+            ) -> None:
         '''
         Generates a simple circuit
         '''
-        CX = CNOT()
-        H = Hadamard()
+        cx = cnot()
+        had = hadamard()
 
-        bb = BloqBuilder() 
+        bb = BloqBuilder()
 
         qubits = [
             bb.add_register(f'q{i}', 1)
             for i in range(n_qubits)
         ]
-        
+
         for _ in range(n_repetitions):
             for i in range(n_qubits - 1):
-                qubits[i] = bb.add(H, q=qubits[i])
-                qubits[i], qubits[i + 1] = bb.add(CX, ctrl=qubits[i], target=qubits[i + 1])
-        cbloq=bb.finalize(**{f'q{i}':qubits[i] for i in range(len(qubits))})
+                qubits[i] = bb.add(had, q=qubits[i])
+                qubits[i], qubits[i + 1] = bb.add(
+                    cx,
+                    ctrl=qubits[i], target=qubits[i + 1]
+                )
+        cbloq = bb.finalize(**{f'q{i}': qubits[i] for i in range(len(qubits))})
         return cbloq
 
     @staticmethod
     def consume(iterable: typing.Iterable):
         '''
             Forces evaluation of all elements in an iterable
-            Useful for stateful map operations without allocating memory 
+            Useful for stateful map operations without allocating memory
         '''
         for _ in iterable:
             pass
 
     @staticmethod
     def non_empty(iterable: typing.Iterable) -> bool:
+        '''
+            Checks if an iterable is empty
+        '''
         try:
             next(iterable)
             return True
@@ -104,7 +106,7 @@ class TestHelpers():
     @staticmethod
     def generator_equality(
             circuit: cirq.Circuit,
-            bloq: CompositeBloq 
+            bloq: CompositeBloq
             ) -> bool:
         '''
             Tests equality for generator decompose
@@ -112,7 +114,7 @@ class TestHelpers():
         # Test that the bloq is not empty
         assert TestHelpers.non_empty(generator_decompose(bloq))
 
-        # Test that all decomposition objects match  
+        # Test that all decomposition objects match
         return all(
             map(
                 lambda x: x[0] == x[1],
@@ -136,9 +138,11 @@ class TestHelpers():
             :: decomp : int :: Number of decompositions for the decomp_multi
         '''
         # Test that the bloq is not empty
-        assert TestHelpers.non_empty(iter(circuit_decompose_multi(bloq, decomp)))
-    
-        # Test that all decomposition objects match 
+        assert TestHelpers.non_empty(
+                iter(circuit_decompose_multi(bloq, decomp))
+               )
+
+        # Test that all decomposition objects match
         return all(
             map(
                 lambda x: x[0] == x[1],
@@ -152,7 +156,7 @@ class TestHelpers():
     @staticmethod
     def generator_commutative_equality(
             circuit: cirq.Circuit,
-            bloq: CompositeBloq 
+            bloq: CompositeBloq
             ) -> bool:
         '''
             Tests equality for generator decompose
@@ -216,7 +220,7 @@ class TestHelpers():
          Composes bloqs together
          This is a naive method that serves to test composite bloqs
         '''
-        regs = [Register(f'q{i}', dtype=QBit()) for i in range(n_regs)] 
+        regs = [Register(f'q{i}', dtype=QBit()) for i in range(n_regs)]
         soquets = [None for _ in range(n_regs)]
 
         bb = BloqBuilder()
@@ -225,12 +229,16 @@ class TestHelpers():
 
         for bloq in bloqs:
             n_args = len(list(bloq.signature.lefts()))
-            bindings = {reg.name:arg for reg, arg in zip(bloq.signature.lefts(), soquets)}
-            soquets[:n_args] = bb.add(bloq, **bindings) 
+            bindings = {
+                    reg.name: arg
+                    for reg, arg in zip(bloq.signature.lefts(), soquets)
+                }
+            soquets[:n_args] = bb.add(bloq, **bindings)
 
-        cbloq = bb.finalize(**{reg.name:soquet for reg, soquet in zip(regs, soquets)})
+        cbloq = bb.finalize(**{
+            reg.name: soquet for reg, soquet in zip(regs, soquets)
+        })
         return cbloq
-
 
     @staticmethod
     def naive_decomposable_bloq(n_regs, *bloqs):
@@ -238,34 +246,48 @@ class TestHelpers():
             Factory for decomposable bloqs
         '''
         class NaiveDecomposableBloq(GateWithRegisters):
+            '''
+                Dynamically generated class bloq instance
+            '''
 
             # Placeholders
-            n_regs = None 
-            bloqs = None 
+            # These are set by the factory after the class is instantiated
+            # This avoids scope issues
+            n_regs = None
+            bloqs = None
 
             @property
             def signature(self):
                 return Signature(
-                        [Register(f'q{i}', dtype=QBit()) for i in range(self.n_regs)]
-                       )
+                    [
+                        Register(f'q{i}', dtype=QBit())
+                        for i in range(self.n_regs)
+                    ]
+                   )
 
             def build_composite_bloq(
-                self,
-                bb: BloqBuilder,
-                **kwargs):
+                    self,
+                    bb: BloqBuilder,
+                    **kwargs) -> dict:
                 '''
                  Composes bloqs together
                  This is a naive method that serves to test composite bloqs
                 '''
-                regs = [Register(f'q{i}', dtype=QBit()) for i in range(self.n_regs)] 
+                regs = [
+                    Register(f'q{i}', dtype=QBit())
+                    for i in range(self.n_regs)
+                ]
                 soquets = [kwargs[reg.name] for reg in regs]
 
                 for bloq in self.bloqs:
                     n_args = len(list(bloq.signature.lefts()))
-                    bindings = {reg.name:arg for reg, arg in zip(bloq.signature.lefts(), soquets)}
-                    soquets[:n_args] = bb.add(bloq, **bindings) 
+                    bindings = {
+                        reg.name: arg
+                        for reg, arg in zip(bloq.signature.lefts(), soquets)
+                    }
+                    soquets[:n_args] = bb.add(bloq, **bindings)
 
-                return {reg.name:soquet for reg, soquet in zip(regs, soquets)}
+                return {reg.name: soquet for reg, soquet in zip(regs, soquets)}
 
             def _decompose_with_context_(self, *, context=None, **kwargs):
                 yield from self.bloqs
