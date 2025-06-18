@@ -10,6 +10,9 @@ import numpy
 import cirq
 from qualtran import CompositeBloq, Register, QBit, BloqBuilder, Bloq, Signature
 from qualtran._infra.gate_with_registers import GateWithRegisters
+from qualtran.bloqs.basic_gates import CNOT, Hadamard
+from qualtran import BloqBuilder
+
 
 from pyLIQTR.utils.meta import MetaBloq
 from pyLIQTR.utils.circuit_decomposition import circuit_decompose_multi
@@ -32,6 +35,54 @@ class TestHelpers():
         Class containing static methods for comparisons between decomposed  
         bloqs and circuits
     '''
+
+    @staticmethod
+    def generate_circuit(
+            *,
+            n_repetitions: int = 1,
+            n_qubits: int = 2
+            ) -> cirq.Circuit:
+        '''
+        Generates a simple circuit to test on
+        '''
+        circ = cirq.Circuit()
+        q = [cirq.LineQubit(i) for i in range(n_qubits)]
+
+        for _ in range(n_repetitions):
+            for i in range(n_qubits - 1):
+                circ.append(cirq.H(q[i]))
+                circ.append(cirq.CNOT(q[i], q[i + 1]))
+
+        return circ
+
+
+    @staticmethod
+    def generate_bloqs(
+        *,
+        n_repetitions: int = 1,
+        n_qubits: int = 2,
+        CNOT = CNOT,
+        Hadamard = Hadamard,
+        ) -> None:
+        '''
+        Generates a simple circuit
+        '''
+        CX = CNOT()
+        H = Hadamard()
+
+        bb = BloqBuilder() 
+
+        qubits = [
+            bb.add_register(f'q{i}', 1)
+            for i in range(n_qubits)
+        ]
+        
+        for _ in range(n_repetitions):
+            for i in range(n_qubits - 1):
+                qubits[i] = bb.add(H, q=qubits[i])
+                qubits[i], qubits[i + 1] = bb.add(CX, ctrl=qubits[i], target=qubits[i + 1])
+        cbloq=bb.finalize(**{f'q{i}':qubits[i] for i in range(len(qubits))})
+        return cbloq
 
     @staticmethod
     def consume(iterable: typing.Iterable):

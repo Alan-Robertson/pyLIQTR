@@ -96,15 +96,24 @@ class Repeat(MetaBloq):
         return self._cached_signature
 
     def _qualtran_signature(self) -> Signature:
+        '''
+            Qualtran bloq signature
+        '''
         return self.subbloq.signature
 
     def _cirq_circuit_signature(self) -> Signature:
+        '''
+            Create a signature from the cirq circuit 
+        '''
         signature = Signature(
             [Register(f'q{i}', dtype=QBit()) for i, _ in enumerate(self.subbloq.all_qubits())]
             )
         return signature 
 
     def _cirq_gate_signature(self) -> Signature: 
+        '''
+            Create a signature from the cirq gate 
+        '''
         signature = Signature(
             [Register(f'q{i}', dtype=QBit()) for i, _ in enumerate(self.subbloq.qubits)]
             )
@@ -163,7 +172,7 @@ class Repeat(MetaBloq):
             Naive composite bloq builder
         '''
         for _ in range(self.n_repetitions):
-            bb.add(self.subbloq, **soqs)
+            soqs = bb.add(self.subbloq, **soqs)
         return soqs
 
     def decompose_from_registers(
@@ -271,14 +280,14 @@ class Parameterised(MetaBloq):
                 self,
                 subbloq_gen: FunctionType,
                 *args,
-                caching: bool = False,
+                signature=None,
                 **kwargs
             ):
         '''
             Constructor for the Parameterised tagged Bloq 
             :: subbloq_gen : FunctionType :: Constructor for the gate   
-            :: caching : bool :: Whether the repeated object should be cached
-            :: quregs : dict :: Map back to cirq qubit labels for qualtran bloq
+            :: *args :: Bound args
+            :: **kwargs :: Bound kwargs
         '''
         self.subbloq_gen = subbloq_gen
 
@@ -287,19 +296,26 @@ class Parameterised(MetaBloq):
 
         self.args = None 
         self.kwargs = None 
+        self._signature = signature
 
     @property
     def signature(self) -> Signature:
         '''
             Signature is instantiated after resolution
         '''
-        pass
+        return self._signature
 
     def __str__(self) -> str:
         '''
             Due to strcmp operations elsewhere in pyLIQTR this may cause issues
         '''
         return f'PARAM({str(self.subbloq)})'
+
+    def bind_signature(self, signature):
+        '''
+            Setter for the signature
+        '''
+        self._signature = signature
 
     def bind_params(self, *args, **kwargs):
         '''
@@ -374,7 +390,7 @@ class ParamMap(MetaBloq):
             Naive composite bloq builder
         '''
         for subbloq in self.compose():
-            bb.add(subbloq, **soqs)
+            soqs = bb.add(subbloq, **soqs)
         return soqs
 
     @staticmethod

@@ -18,33 +18,14 @@ class TestRepeatBloq(unittest.TestCase, TestHelpers):
     '''
         Tests for the Repeat Bloq
     '''
-
-    @staticmethod
-    def generate_circuit(
-            *,
-            n_repetitions: int = 1,
-            n_qubits: int = 2
-            ) -> cirq.Circuit:
-        '''
-        Generates a simple circuit to test on
-        '''
-        circ = cirq.Circuit()
-        q = [cirq.LineQubit(i) for i in range(n_qubits)]
-
-        for _ in range(n_repetitions):
-            for i in range(n_qubits - 1):
-                circ.append(cirq.H(q[i]))
-                circ.append(cirq.CNOT(q[i], q[i + 1]))
-
-        return circ
     
     def test_bloq(self, n_qubits: int = 5, n_repetitions: int = 7):
         '''
             Tests wrapping a CompositeBloq in a Repeat
         '''
 
-        circ = self.generate_circuit(n_qubits=n_qubits)
-        repeated_circuit = self.generate_circuit(
+        circ = TestHelpers.generate_circuit(n_qubits=n_qubits)
+        repeated_circuit = TestHelpers.generate_circuit(
             n_repetitions=n_repetitions,
             n_qubits=n_qubits
         )
@@ -98,10 +79,10 @@ class TestRepeatBloq(unittest.TestCase, TestHelpers):
         '''
 
         # Single instance of the circuit
-        circ = self.generate_circuit(n_qubits=n_qubits)
+        circ = TestHelpers.generate_circuit(n_qubits=n_qubits)
 
         # Baseline repeated circuit to test against
-        repeated_circuit = self.generate_circuit(
+        repeated_circuit = TestHelpers.generate_circuit(
             n_repetitions=n_repetitions,
             n_qubits=n_qubits
         )
@@ -125,12 +106,12 @@ class TestRepeatBloq(unittest.TestCase, TestHelpers):
             Test wrapping a repeat bloq in a CompositeBloq 
         '''
         # Single instance of the circuit
-        circ = self.generate_circuit(n_qubits=n_qubits)
+        circ = TestHelpers.generate_circuit(n_qubits=n_qubits)
                                                                 # Test runner without invoking subprocesses
         # Baseline repeated circuit to test against            
         # We will be adding two repeat bloqs to the composition
         # So this should be twice the number of repetitions 
-        repeated_circuit = self.generate_circuit(              
+        repeated_circuit = TestHelpers.generate_circuit(              
             n_repetitions=n_repetitions * 2,
             n_qubits=n_qubits
         )
@@ -157,12 +138,12 @@ class TestRepeatBloq(unittest.TestCase, TestHelpers):
             Test wrapping a repeat bloq in a CompositeBloq 
         '''
         # Single instance of the circuit
-        circ = self.generate_circuit(n_qubits=n_qubits)
+        circ = TestHelpers.generate_circuit(n_qubits=n_qubits)
                                                                 # Test runner without invoking subprocesses
         # Baseline repeated circuit to test against            
         # We will be adding two repeat bloqs to the composition
         # So this should be twice the number of repetitions 
-        repeated_circuit = self.generate_circuit(              
+        repeated_circuit = TestHelpers.generate_circuit(              
             n_repetitions=n_repetitions * 2,
             n_qubits=n_qubits
         )
