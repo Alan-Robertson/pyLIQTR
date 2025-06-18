@@ -3,17 +3,16 @@
     Contains the Repeat meta-bloq
     Also contains a helper function circuit_to_quregs
 '''
-from typing import Dict, Iterator, Generator 
+from typing import Dict, Iterator, Generator
 from types import FunctionType
 from numpy.typing import NDArray
 
 import cirq
 import qualtran
-from qualtran._infra.gate_with_registers import GateWithRegisters
 from qualtran._infra.registers import Signature, Register, QBit
 
 
-from pyLIQTR.utils.meta import MetaBloq 
+from pyLIQTR.utils.meta import MetaBloq
 
 
 def circuit_to_quregs(circuit: cirq.Circuit) -> dict:
@@ -63,21 +62,21 @@ class Repeat(MetaBloq):
         self._cached = None
 
         # Dynamic dispatch
-        # Sets different decomposers depending on the input
-        self._decompose = None
+        # Sets different composers depending on the input
+        self._compose = None
         self._signature = None
         self._cached_signature = None
 
         if issubclass(type(subbloq), qualtran.Bloq):
-            self._decompose = self._qualtran_bloq_decomp
+            self._compose = self._qualtran_bloq_decomp
             self._signature = self._qualtran_signature
 
         elif issubclass(type(subbloq), cirq.Gate):
-            self._decompose = self._cirq_gate_decomp
+            self._compose = self._cirq_gate_decomp
             self._signature = self._cirq_gate_signature
 
         elif issubclass(type(subbloq), cirq.Circuit):
-            self._decompose = self._cirq_circuit_decomp
+            self._compose = self._cirq_circuit_decomp
             self._signature = self._cirq_circuit_signature
 
         else:
@@ -91,7 +90,7 @@ class Repeat(MetaBloq):
             Signature is directly inherited from the subbloq
             May throw errors if the subbloq lacks a signature
         '''
-        if self._cached_signature is None: 
+        if self._cached_signature is None:
             self._cached_signature = self._signature()
         return self._cached_signature
 
@@ -103,16 +102,16 @@ class Repeat(MetaBloq):
 
     def _cirq_circuit_signature(self) -> Signature:
         '''
-            Create a signature from the cirq circuit 
+            Create a signature from the cirq circuit
         '''
         signature = Signature(
             [Register(f'q{i}', dtype=QBit()) for i, _ in enumerate(self.subbloq.all_qubits())]
             )
-        return signature 
+        return signature
 
-    def _cirq_gate_signature(self) -> Signature: 
+    def _cirq_gate_signature(self) -> Signature:
         '''
-            Create a signature from the cirq gate 
+            Create a signature from the cirq gate
         '''
         signature = Signature(
             [Register(f'q{i}', dtype=QBit()) for i, _ in enumerate(self.subbloq.qubits)]
@@ -132,7 +131,7 @@ class Repeat(MetaBloq):
             ]:
         '''
             _cirq_decomp
-            Cirq gate decomposer
+            Cirq gate composer
             Expected input is a single cirq gate object
         '''
         yield self.subbloq(*self.args, **self.kwargs)
@@ -144,7 +143,7 @@ class Repeat(MetaBloq):
             ]:
         '''
             _cirq_gate_decomp
-            Cirq circuit decomposer
+            Cirq circuit composer
         '''
         for moment in self.subbloq:
             yield from moment
@@ -156,7 +155,7 @@ class Repeat(MetaBloq):
             ]:
         '''
             _qualtran_decomp
-            Qualtran decomposer
+            Qualtran composer
         '''
         yield self.subbloq.to_cirq_circuit(
             *self.args,
@@ -175,19 +174,19 @@ class Repeat(MetaBloq):
             soqs = bb.add(self.subbloq, **soqs)
         return soqs
 
-    def decompose_from_registers(
+    def compose_from_registers(
         self,
         *args,
         context: cirq.DecompositionContext,
         **quregs: NDArray[cirq.Qid]
     ) -> Iterator[cirq.OP_TREE]:
         '''
-            decompose_from_registers
+            compose_from_registers
             Uses the subbloq's decomposition function and repeats the output
         '''
         if self.caching:
             cached_obj = list(
-                self.subbloq.decompose_from_registers(
+                self.subbloq.compose_from_registers(
                     *args,
                     context,
                     quregs
@@ -195,13 +194,13 @@ class Repeat(MetaBloq):
             )
             ops = iter(cached_obj)
         else:
-            ops = self.subbloq.decompose_from_registers(*args, context, quregs)
+            ops = self.subbloq.compose_from_registers(*args, context, quregs)
 
         for _ in range(self.n_repetitions):
             yield from ops
 
     #pylint: disable=arguments-differ, unused-argument
-    def _decompose_with_context_(self, *, context=None, **kwargs) -> Generator[
+    def _compose_with_context_(self, *, context=None, **kwargs) -> Generator[
             qualtran.Bloq | cirq.Gate | cirq.Circuit,
             None,
             None
@@ -211,41 +210,41 @@ class Repeat(MetaBloq):
             context = cirq.DecompositionContext(
                 cirq.ops.SimpleQubitManager()
             )
-        yield from self.decompose()
+        yield from self.compose()
 
-    def decompose(self) -> Generator[
+    def compose(self) -> Generator[
             qualtran.Bloq | cirq.Gate | cirq.Circuit,
             None,
             None
             ]:
         '''
-        Dispatch method for decomposer
+        Dispatch method for composer
         Dynamic dispatch is set in the constructor
         '''
         for _ in range(self.n_repetitions):
-            yield from self.decompose_once()
+            yield from self.compose_once()
 
     def __iter__(self) -> Generator[
             qualtran.Bloq | cirq.Gate | cirq.Circuit,
             None,
             None
             ]:
-        return self.decompose()
+        return self.compose()
 
-    def decompose_once(self) -> Generator[
+    def compose_once(self) -> Generator[
             qualtran.Bloq | cirq.Gate | cirq.Circuit,
             None,
             None
             ]:
         '''
-            Returns a single decomposition
+            Returns a single ecomposition
         '''
         if self.caching:
             if self._cached is None:
-                self._cached = tuple(self._decompose())
+                self._cached = tuple(self._compose())
             decomp = self._cached
         else:
-            decomp = self._decompose()
+            decomp = self._compose()
 
         yield from decomp
 
@@ -270,10 +269,10 @@ class Repeat(MetaBloq):
 
 class Parameterised(MetaBloq):
     '''
-        Parameterised Tagging Bloq 
-        Transparent Bloq wrapper that indicates to a `Map' bloq that this gate consumes arguments  
+        Parameterised Tagging Bloq
+        Transparent Bloq wrapper that indicates to a `Map' bloq that this gate consumes arguments
         This Bloq should not be used outside of wrapper bloqs that handle the instantiation of
-        parameters 
+        parameters
     '''
 
     def __init__(
@@ -284,18 +283,18 @@ class Parameterised(MetaBloq):
                 **kwargs
             ):
         '''
-            Constructor for the Parameterised tagged Bloq 
-            :: subbloq_gen : FunctionType :: Constructor for the gate   
+            Constructor for the Parameterised tagged Bloq
+            :: subbloq_gen : FunctionType :: Constructor for the gate
             :: *args :: Bound args
             :: **kwargs :: Bound kwargs
         '''
         self.subbloq_gen = subbloq_gen
 
         self.bound_args = args
-        self.bound_kwargs = kwargs 
+        self.bound_kwargs = kwargs
 
-        self.args = None 
-        self.kwargs = None 
+        self.args = None
+        self.kwargs = None
         self._signature = signature
 
     @property
@@ -319,9 +318,9 @@ class Parameterised(MetaBloq):
 
     def bind_params(self, *args, **kwargs):
         '''
-            Setter method for binding args and kwargs 
+            Setter method for binding args and kwargs
         '''
-        self.args = args 
+        self.args = args
         self.kwargs = kwargs
 
     def compose(self) -> Generator[
@@ -330,21 +329,22 @@ class Parameterised(MetaBloq):
             None
             ]:
         '''
-        Dispatch method for decomposer
+        Dispatch method for composer
         Dynamic dispatch is set in the constructor
         '''
         bloq = self.subbloq_gen(
             *self.bound_args, *self.args,
             **self.bound_kwargs, **self.kwargs
         )
-        yield bloq 
+        yield bloq
+
 
 class ParamMap(MetaBloq):
     '''
-        Parameterised Mapping Gate 
-        Bloq that takes a series of parameters and a sequence of gates / bloq objects  
-        When decomposed the parameters are consumed and the gate sequence is emitted
-        Parameters are consumed by Parameterised Bloqs 
+        Parameterised Mapping Gate
+        Bloq that takes a series of parameters and a sequence of gates / bloq objects
+        When composed the parameters are consumed and the gate sequence is emitted
+        Parameters are consumed by Parameterised Bloqs
     '''
 
     def __init__(
@@ -355,15 +355,15 @@ class ParamMap(MetaBloq):
                 **kwargs
             ):
         '''
-            Constructor for the Parameterised tagged Bloq 
-            :: subbloq_gen : FunctionType :: Constructor for the gate   
+            Constructor for the Parameterised tagged Bloq
+            :: subbloq_gen : FunctionType :: Constructor for the gate
             :: caching : bool :: Whether the repeated object should be cached
             :: quregs : dict :: Map back to cirq qubit labels for qualtran bloq
         '''
         self.sequence = gate_sequence
         self.parameters = parameters
 
-        self.kwargs = kwargs 
+        self.kwargs = kwargs
         self.caching = caching
         self.cache = []
         self.cache_state = []
@@ -373,13 +373,12 @@ class ParamMap(MetaBloq):
         '''
             Signature is instantiated after resolution
         '''
-        pass
 
     def __str__(self) -> str:
         '''
             Due to strcmp operations elsewhere in pyLIQTR this may cause issues
         '''
-        return f'MAP'
+        return 'MAP'
 
     def build_composite_bloq(
             self,
@@ -395,15 +394,19 @@ class ParamMap(MetaBloq):
 
     @staticmethod
     def infer_params(*params):
+        '''
+            Stodgy parameter inference method
+            This should definitely be improved
+        '''
         args = []
         kwargs = {}
 
         for param in params:
-            if isinstance(param, dict): 
+            if isinstance(param, dict):
                 kwargs |= param
             elif isinstance(param, list):
                 args += param
-            else: 
+            else:
                 args.append(param)
         return args, kwargs
 
@@ -413,20 +416,20 @@ class ParamMap(MetaBloq):
             None
             ]:
         '''
-        Dispatch method for decomposer
+        Dispatch method for composer
         Dynamic dispatch is set in the constructor
         '''
         cache_idx = 0
         params = iter(self.parameters)
         for bloq in self.sequence:
 
-            # Special handling for flattening generators 
+            # Special handling for flattening generators
             if isinstance(bloq, Generator):
-                for subbloq in bloq: 
+                for subbloq in bloq:
                     yield self.resolve_params(subbloq, params, cache_idx)
                     cache_idx += 1
 
-            else: # Non-generator
+            else:  # Non-generator
                 yield self.resolve_params(bloq, params, cache_idx)
                 cache_idx += 1
 
@@ -437,10 +440,10 @@ class ParamMap(MetaBloq):
         # Collect Parameterised Tags
         if isinstance(bloq, Parameterised):
 
-            # Infer params 
+            # Infer params
             args, kwargs = self.infer_params(next(params))
-            
-            # Bind params to bloq instance 
+
+            # Bind params to bloq instance
             bloq.bind_params(*args, **kwargs)
 
             for seq in bloq.compose():
@@ -450,9 +453,9 @@ class ParamMap(MetaBloq):
                 self.cache_state.append(False)
                 self.cache.append(None)
 
-        else:  # Not Parameterised 
+        else:  # Not Parameterised
             # Cache undiscovered object
-            if self.caching: 
+            if self.caching:
 
                 if (cache_idx < len(self.cache_state) and self.cache_state[cache_idx] is True):
                     return self.cache[cache_idx]
@@ -461,7 +464,7 @@ class ParamMap(MetaBloq):
                 self.cache_state.append(True)
 
             return bloq
-    
+
     def append(self, bloq: qualtran.Bloq | cirq.Gate | cirq.Circuit):
         '''
             Adds another gate to the sequence

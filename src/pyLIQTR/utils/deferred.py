@@ -2,13 +2,11 @@
     deferred.py
     Bloqs that defer instantiation
 '''
-from typing import Dict, Iterator, Generator
+from typing import Generator
 from types import FunctionType
-from numpy.typing import NDArray
 
 import cirq
 import qualtran
-from qualtran._infra.gate_with_registers import GateWithRegisters
 from qualtran._infra.registers import Signature, Register, QBit
 
 
@@ -18,7 +16,7 @@ from pyLIQTR.utils.meta import MetaBloq
 class Deferred(MetaBloq):
     '''
         This Bloq exists to defer instantiation
-        It is also possible to pass a generating function into this block 
+        It is also possible to pass a generating function into this block
         in lieu of a constructor
         The constructor for the deferred bloq is only instantiated during decomposition
         This allows for the seperation of decompose_multi and generator_decompose
@@ -31,7 +29,6 @@ class Deferred(MetaBloq):
                 *args,
                 registers: Register = None,
                 n_thru_registers: int = None,
-                caching: bool = False,
                 **kwargs
             ):
         '''
@@ -40,8 +37,8 @@ class Deferred(MetaBloq):
             :: *args :: Args to the deferred bloq
             :: quregs : dict :: Map back to cirq qubit labels for qualtran bloq
             :: **kwargs :: Kwargs to the deferred bloq
-            :: registers : Register :: Register object 
-            :: n_thru_registers : init :: Generate an n qubit register signature 
+            :: registers : Register :: Register object
+            :: n_thru_registers : init :: Generate an n qubit register signature
         '''
         self.subbloq_gen = subbloq_gen
 
@@ -50,12 +47,12 @@ class Deferred(MetaBloq):
         self.registers = registers
 
         if self.registers is not None:
-            self._signature = Signature(self.registers) 
+            self._signature = Signature(self.registers)
         else:
             self._signature = None
 
-        self.args = args 
-        self.kwargs = kwargs 
+        self.args = args
+        self.kwargs = kwargs
 
     @property
     def signature(self) -> Signature:
@@ -89,18 +86,18 @@ class Deferred(MetaBloq):
 class Cached(MetaBloq):
     '''
         This Bloq exists to cache sub-bloqs
-        Defers instantiation 
+        Defers instantiation
         Generates singleton instances of sub-bloqs
-        
-        Cached elements may be dynamically altered without reconstructing 
+
+        Cached elements may be dynamically altered without reconstructing
         the global object by re-writing the entry in the SINGLETON_CACHE
 
         Overwriting the cache variable itself will unbind the new instance
         at the object level
 
-        Behaviour of overwriting the entire cache at the class level will 
+        Behaviour of overwriting the entire cache at the class level will
         depend on whether it is instantiated as a slot with double indirection
-        or as a per-instance reference in each vtable 
+        or as a per-instance reference in each vtable
     '''
 
     SINGLETON_CACHE = {}
@@ -114,15 +111,15 @@ class Cached(MetaBloq):
             ):
         '''
             Constructor for the Parameterised tagged Bloq
-            :: tag : Hashable ::   
+            :: tag : Hashable ::
             :: subbloq_gen : FunctionType :: Constructor for the gate
             :: quregs : dict :: Map back to cirq qubit labels for qualtran bloq
         '''
         self.tag = tag
         self.subbloq_gen = subbloq_gen
 
-        self.args = args 
-        self.kwargs = kwargs 
+        self.args = args
+        self.kwargs = kwargs
 
     @property
     def signature(self) -> Signature:
@@ -146,7 +143,7 @@ class Cached(MetaBloq):
         Dispatch method for decomposer
         '''
         cache_entry = Cached.SINGLETON_CACHE.get(self.tag, None)
-    
+
         if cache_entry is None:
             bloq = self.subbloq_gen(
                 *self.args,
