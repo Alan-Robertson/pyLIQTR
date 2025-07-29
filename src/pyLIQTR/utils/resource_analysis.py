@@ -1,16 +1,21 @@
 """
 Copyright (c) 2024 Massachusetts Institute of Technology 
 SPDX-License-Identifier: BSD-2-Clause
+Copyright (c) 2024 Massachusetts Institute of Technology 
+SPDX-License-Identifier: BSD-2-Clause
 """
 import random
 import cachetools
 import numpy    as  np
 import cirq     as  cirq
 import qualtran as  qt
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any, Tuple, Union, Optional
 
 from warnings import warn
 
+# From Microsoft's(r) Azure
+from qsharp.estimator import EstimatorResult
+from qsharp.estimator import LogicalCounts
 
 from   pyLIQTR.utils.circuit_decomposition import decompose_once, circuit_decompose_multi
 from   pyLIQTR.gate_decomp.cirq_transforms import clifford_plus_t_direct_transform
@@ -65,6 +70,7 @@ def _pylqt_t_complexity_for_gate_or_op(
             _from_iterable,
         ]
     return _t_complexity_from_strategies(gate_or_op, strategies)
+    
 
 def pylqt_t_complexity(stc: Any) -> TComplexity:
     """
@@ -79,11 +85,12 @@ def pylqt_t_complexity(stc: Any) -> TComplexity:
     """
     if isinstance(stc, (cirq.Gate, cirq.Operation, Bloq)) and isinstance(stc, Hashable):
         ret = _pylqt_t_complexity_for_gate_or_op(stc)
-    elif isinstance(stc, (cirq.Circuit)):
+    elif isinstance(stc, (cirq.Circuit)) or issubclass(stc,cirq.Circuit):
         ret = TComplexity()
         for moment in stc:
             for op in moment:
                 thisComplexity = _pylqt_t_complexity_for_gate_or_op(op)
+                    
                 if thisComplexity is None:
                     ret = None
                     stc = op
@@ -113,11 +120,17 @@ def from_measurement(stc:Any)->TComplexity:
 def estimate_resources(circuit_element:Any, rotation_gate_precision=1e-10, circuit_precision=None,
                        profile=False) -> Dict:
     """
-    Keyword arguments:
-    circuit_element -- element to estimate resources of. Can be circuit, gate, or operation.
-    rotation_gate_precision -- maximum approximation error for each rotation gate decomposition
-    circuit_precision -- If not None, the approximation error for each rotation gate will be bounded by `circuit_precision` divided by the number of rotation gates in `circuit_element`
-    profile -- set to True to include rotation gates as a separate count rather than estimating their Clifford+T counts
+    :param circuit_element: element to estimate resources of. Can be circuit, gate, or operation.
+    :param rotation_gate_precision: maximum approximation error for each rotation gate decomposition
+    :param circuit_precision: If not None, the approximation error for each rotation gate will be bounded by `circuit_precision` divided by the number of rotation gates in `circuit_element`
+    :param profile: set to True to include rotation gates as a separate count rather than estimating their Clifford+T counts
+
+    :returns: a dict containing all gates types their numbers
+    {
+        "T": 10,
+        "Clifford": 20,
+        "Rotations" : 30 // Rotations are only included when `profile` is True
+    } 
     """
     try:
         resource_dict = {'LogicalQubits':cirq.num_qubits(circuit_element)}
@@ -142,12 +155,24 @@ def estimate_resources(circuit_element:Any, rotation_gate_precision=1e-10, circu
                 Ts_from_rotations = get_T_counts_from_rotations(t_cliff_rot_resources.rotations,gate_precision=rotation_gate_precision)
             
             resource_dict["T"] +=  Ts_from_rotations
-            resource_dict["Clifford"] += 2*Ts_from_rotations + 1    
+            resource_dict["Clifford"] += 2*Ts_from_rotations + 1
+            # It may be possible to get the cczCount by dividing t_cliff_rot_resources.t / 6
+            # if Ts_from_rotations == 0
     else:
         ## Should probably do a better job profiling via some heuristics
         ##
         resource_dict["Rotations"] = t_cliff_rot_resources.rotations
 
+    # Some additional resources to be able to return that can be used in the current Azure(r) hardware estimates
+    """    
+        "numQubits" resource_dict['LogicalQubits']
+        "tCount" resource_dict["T"]
+        "rotationCount" resource_dict["Rotations"]
+        "rotationDepth" 
+        "cczCount" # Toffoli Factory
+        "ccixCount" # Toffoli?
+        "measurementCount"
+    """
     return resource_dict
 
 def get_T_counts_from_rotations(num_rotation_gates,gate_precision=1e-8,circuit_precision=None,seed=0):
@@ -238,7 +263,7 @@ def t_complexity_from_circuit(circ):
 
 def legacy_resource_profile(gate):
     
-    circ = cirq.Circuit()
+    circ = cirq.Circuit() # type: ignore
     circ.append(gate)
 
     circ_cops = circuit_decompose_multi(circ,2)
