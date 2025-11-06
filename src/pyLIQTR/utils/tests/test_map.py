@@ -91,7 +91,6 @@ class TestParamMapBloq(unittest.TestCase, TestHelpers):
             bloq
         )
 
-
 # Test runner without invoking subprocesses
 # Used for interactive and pdb hooks
 if __name__ == '__main__':
